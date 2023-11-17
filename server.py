@@ -1,37 +1,30 @@
 import asyncio
 import json
-import aiohttp
-from aiohttp import web
+import websockets
 from utils import fetch_weather
 
-async def handle_weather_request(websocket, city):
-    weather_data = fetch_weather(city)
-    if weather_data:
-        await websocket.send_json(weather_data)
-    else:
-        await websocket.send_str("Error fetching weather data.")
+# This is an asynchronous function that handles a weather request.
+async def handle_weather_request(websocket, path):
+    # This loop waits for a message from the client(s).
+    async for message in websocket:
+        # The message is expected to be a JSON string representing a city name.
+        # json.loads parses the JSON string into a Python object.
+        city = json.loads(message)
+        # Fetch the weather data for the cit.
+        weather_data = fetch_weather(city)
+        # If weather data exists, send it back to the client(s).
+        if weather_data:
+            # json.dumps convert the Python object back into a JSON string.
+            await websocket.send(json.dumps(weather_data))
+        # If no weather data, send an error message back to the client(s).
+        else:
+            await websocket.send("Error fetching weather data.")
 
-async def handle_websocket(request):
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
+# Create a WebSocket server that listens on localhost port 8765
+# The server uses the handle_weather_request function to handle requests
+start_server = websockets.serve(handle_weather_request, "localhost", 8765)
 
-    async for msg in ws:
-        if msg.type == aiohttp.WSMsgType.TEXT:
-            await handle_weather_request(ws, msg.data)
-        elif msg.type == aiohttp.WSMsgType.ERROR:
-            print('ws connection closed with exception %s' % ws.exception())
-
-    print('websocket connection closed')
-
-    return ws
-
-async def start_server():
-    app = web.Application()
-    app.router.add_route('GET', '/weather', handle_websocket)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8080)
-    await site.start()
-
-if __name__ == "__main__":
-    asyncio.run(start_server())
+# Start the server
+asyncio.get_event_loop().run_until_complete(start_server)
+# Keep the server running forever
+asyncio.get_event_loop().run_forever()
