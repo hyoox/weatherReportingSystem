@@ -35,3 +35,5 @@ To use Weather Reporting System, follow these steps:
    ```
 
 The client script will prompt you to enter a city name. Type the name of a city and press Enter to retrieve its weather. To exit the application, type 'quit'.
+
+**It supports multiple clients requesting weather data for different cities simultaneously.**
