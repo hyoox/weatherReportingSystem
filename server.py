@@ -1,7 +1,12 @@
 import asyncio
 import json
 import websockets
+import ssl
 from utils import fetch_weather
+
+# Create a SSL context
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ssl_context.load_cert_chain('localhost.pem', 'localhost-key.pem')
 
 # This is an asynchronous function that handles a weather request.
 async def handle_weather_request(websocket, path):
@@ -26,13 +31,12 @@ async def handle_weather_request(websocket, path):
         # If the client disconnects, print a message to the console.
         print("Client disconnected")
 
-# Create a WebSocket server that listens on localhost port 8765
-# The server uses the handle_weather_request function to handle requests
-start_server = websockets.serve(handle_weather_request, "localhost", 8765)
+# Create a Secure WebSocket server that listens on localhost port 8765
+start_server = websockets.serve(handle_weather_request, "localhost", 8765, ssl=ssl_context)
 
 # Start the server
 asyncio.get_event_loop().run_until_complete(start_server)
 # Print a message to the console indicating that the server has started.
-print("Server started")
+print("Secure server started")
 # Keep the server running forever
 asyncio.get_event_loop().run_forever()

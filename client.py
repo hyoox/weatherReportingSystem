@@ -1,11 +1,17 @@
 import asyncio
 import json
 import websockets
+import ssl
+
+# Create a SSL context
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
 # This is an asynchronous function that sends a weather request for a given city.
 async def send_weather_request(city):
-    # Connect to the WebSocket server at ws://localhost:8765
-    async with websockets.connect('ws://localhost:8765') as websocket:
+    # Connect to the Secure WebSocket server at wss://localhost:8765
+    async with websockets.connect('wss://localhost:8765', ssl=ssl_context) as websocket:
         # Send the city name to the server.
         # json.dumps converts the Python string into a JSON string.
         await websocket.send(json.dumps(city))
