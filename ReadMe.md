@@ -14,7 +14,7 @@ Sure, here's a step-by-step guide in Markdown format:
     Open a terminal and run the following command to install the necessary Python libraries:
 
     ```bash
-    pip install websockets asyncio
+    pip install websockets asyncio requests
     ```
 
     If you're using a specific Python environment or if you have both Python 2 and Python 3 installed, you might need to use `pip3` instead of `pip`.
