@@ -1,39 +1,54 @@
-# Weather Reporting System
+Sure, here's a step-by-step guide in Markdown format:
 
-Weather Reporting System is a simple Python application that utilizes WebSockets to retrieve weather data for a specified city from the OpenWeatherMap API.
+## Setting Up and Running the Weather Application
 
-## Prerequisites
+### Prerequisites
 
-Before proceeding, ensure you have met the following requirements:
+- Python 3.6 or higher installed
+- OpenSSL installed (for generating SSL certificates)
 
-1. Python 3.6 or later is installed.
+### Steps
 
-2. Both the `websockets` and `requests` Python libraries are installed. You can install them using pip:
+1. **Install necessary Python libraries**
 
-   ```bash
-   pip install websockets requests
-   ```
+    Open a terminal and run the following command to install the necessary Python libraries:
 
-## Using Weather Reporting System
+    ```bash
+    pip install websockets asyncio
+    ```
 
-To use Weather Reporting System, follow these steps:
+    If you're using a specific Python environment or if you have both Python 2 and Python 3 installed, you might need to use `pip3` instead of `pip`.
 
-1. Clone this repository onto your local machine.
+2. **Generate a self-signed SSL certificate**
 
-2. Navigate to the directory containing the code.
+    In the terminal, run the following command:
 
-3. Run the server script:
+    ```bash
+    openssl req -x509 -newkey rsa:4096 -keyout localhost-key.pem -out localhost.pem -days 365 -nodes
+    ```
 
-   ```bash
-   python server.py
-   ```
+    This command will generate a `localhost.pem` file (the certificate) and a `localhost-key.pem` file (the private key). These files should be in the same directory as your `server.py` and `client.py` files.
 
-4. In a separate terminal window, execute the client script:
+3. **Run the server**
 
-   ```bash
-   python client.py
-   ```
+    In the terminal, navigate to the directory containing your `server.py` file and run the following command:
 
-The client script will prompt you to enter a city name. Type the name of a city and press Enter to retrieve its weather. To exit the application, type 'quit'.
+    ```bash
+    python server.py
+    ```
 
-**It supports multiple clients requesting weather data for different cities simultaneously.**
+    If you have both Python 2 and Python 3 installed, you might need to use `python3` instead of `python`.
+
+4. **Run the client**
+
+    Open a new terminal, navigate to the directory containing your `client.py` file and run the following command:
+
+    ```bash
+    python client.py
+    ```
+
+    If you have both Python 2 and Python 3 installed, you might need to use `python3` instead of `python`.
+
+5. **Use the application**
+
+    In the client terminal, you can now enter the name of a city to get its weather. To exit the application, type 'quit'.
