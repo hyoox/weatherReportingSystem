@@ -1,6 +1,4 @@
-Sure, here's a step-by-step guide in Markdown format:
-
-## Setting Up and Running the Weather Application
+# Setting Up and Running the Weather Application
 
 ### Prerequisites
 
