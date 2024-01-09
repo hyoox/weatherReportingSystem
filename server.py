@@ -4,39 +4,42 @@ import websockets
 import ssl
 from utils import fetch_weather
 
-# Create a SSL context
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain('localhost.pem', 'localhost-key.pem')
 
-# This is an asynchronous function that handles a weather request.
-async def handle_weather_request(websocket, path):
+client_counter = 0  # Counter to assign unique IDs to clients
+clients = {}  # Dictionary to keep track of client IDs and websockets
+
+async def handle_client(websocket, path):
+    global client_counter
+    client_id = client_counter
+    clients[client_id] = websocket
+    client_counter += 1
+    print(f"Client#{client_id} connected")
+
     try:
-        # This loop waits for a message from the client(s).
         async for message in websocket:
-            # The message is expected to be a JSON string representing a city name.
-            # json.loads parses the JSON string into a Python object.
-            city = json.loads(message)
-            # Print a message to the console indicating that a request was received for this city.
-            print(f"Got request for {city}")
-            # Fetch the weather data for the city.
-            weather_data = fetch_weather(city)
-            # If weather data exists, send it back to the client(s).
-            if weather_data:
-                # json.dumps convert the Python object back into a JSON string.
-                await websocket.send(json.dumps(weather_data))
-            # If no weather data, send an error message back to the client(s).
-            else:
-                await websocket.send("Error fetching weather data.")
+            data = json.loads(message)
+            if data["type"] == "weather_request":
+                city = data["city"]
+                print(f"Client#{client_id} requested weather for {city}")
+                weather_data = fetch_weather(city)
+                if weather_data:
+                    await websocket.send(json.dumps(weather_data))
+                else:
+                    await websocket.send(json.dumps({"error": "Data not found, please try again with another City name."}))
+            elif data["type"] == "heartbeat":
+                print(f"Heartbeat received from Client#{client_id}")
+                # No response needed for heartbeat
     except websockets.exceptions.ConnectionClosed:
-        # If the client disconnects, print a message to the console.
-        print("Client disconnected")
+        pass  # This block may be left empty
+    finally:
+        print(f"Client#{client_id} disconnected")
+        del clients[client_id]  # Remove client from the dictionary
 
-# Create a Secure WebSocket server that listens on localhost port 8765
-start_server = websockets.serve(handle_weather_request, "localhost", 8765, ssl=ssl_context)
+async def main():
+    async with websockets.serve(handle_client, "localhost", 8765, ssl=ssl_context):
+        await asyncio.Future()  # Run forever
 
-# Start the server
-asyncio.get_event_loop().run_until_complete(start_server)
-# Print a message to the console indicating that the server has started.
-print("Secure server started")
-# Keep the server running forever
-asyncio.get_event_loop().run_forever()
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -3,43 +3,42 @@ import json
 import websockets
 import ssl
 
-# Create a SSL context
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
-# This is an asynchronous function that sends a weather request for a given city.
-async def send_weather_request(city):
-    # Connect to the Secure WebSocket server at wss://localhost:8765
-    async with websockets.connect('wss://localhost:8765', ssl=ssl_context) as websocket:
-        # Send the city name to the server.
-        # json.dumps converts the Python string into a JSON string.
-        await websocket.send(json.dumps(city))
-        # Wait for a response from the server.
-        response = await websocket.recv()
-        # Parse the JSON response into a Python object.
-        weather_data = json.loads(response)
+async def send_weather_request(city, websocket):
+    await websocket.send(json.dumps({"type": "weather_request", "city": city}))
+    response = await websocket.recv()
+    weather_data = json.loads(response)
 
-        # Extract weather information from the JSON response.
+    if 'error' not in weather_data:
         temperature = weather_data['main']['temp']
         humidity = weather_data['main']['humidity']
         description = weather_data['weather'][0]['description']
-
-        # Print the weather information in a more readable format.
         print(f"Weather in {city}:")
         print(f"Temperature: {temperature} °C")
         print(f"Humidity: {humidity}%")
         print(f"Description: {description}")
+    else:
+        print(weather_data['error'])
 
-# This is an asynchronous function that starts the client(s).
-async def start_client():
-    # This loop asks the user for a city name and sends a weather request for that city.
+async def heartbeat(websocket):
     while True:
-        city = input("Enter the name of City to get its weather (or type 'quit' to exit the application): ")
-        if city.lower() == 'quit':
+        try:
+            await websocket.send(json.dumps({"type": "heartbeat"}))
+            await asyncio.sleep(10)  # Send heartbeat every 10 seconds
+        except websockets.exceptions.ConnectionClosed:
             break
-        await send_weather_request(city)
 
-# If this script is run directly (not imported as a module), start the client
+async def client_loop():
+    async with websockets.connect('wss://localhost:8765', ssl=ssl_context) as websocket:
+        asyncio.create_task(heartbeat(websocket))
+        while True:
+            city = input("Enter city name (or 'quit' to exit): ")
+            if city.lower() == 'quit':
+                break
+            await send_weather_request(city, websocket)
+
 if __name__ == "__main__":
-    asyncio.run(start_client())
+    asyncio.run(client_loop())
