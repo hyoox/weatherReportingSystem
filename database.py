@@ -1,33 +1,47 @@
 import json
+from cryptography.fernet import Fernet
 
-# Define the name of the database file
-DB_FILE = "weather_data.json"
+key = b'_DcpngSUGkmH70zr3idflMTCGkM696D13Y7OxtdvIW0='
+cipher_suite = Fernet(key)
 
-# Define a function to save weather data for a city
-def save_weather_data(city, weather_data):
-    # Try to open the database file and load its contents
+DB_FILE = "encrypted_weather_data.json"
+
+def encrypt_data(data):
+    if isinstance(data, bytes):
+        return cipher_suite.encrypt(data)
+    return cipher_suite.encrypt(data.encode())
+
+def decrypt_data(data):
+    return cipher_suite.decrypt(data).decode()
+
+def initialize_encrypted_file():
+    """ Initialize the encrypted file with an empty dictionary if it's empty or doesn't exist. """
     try:
-        with open(DB_FILE, "r") as file:
-            data = json.load(file)
-    # If the file doesn't exist, initialize an empty dictionary
-    except FileNotFoundError:
-        data = {}
+        with open(DB_FILE, "rb") as file:
+            if not file.read():  # Check if file is empty
+                raise FileNotFoundError
+    except (FileNotFoundError, json.JSONDecodeError):
+        with open(DB_FILE, "wb") as file:
+            encrypted_data = encrypt_data(json.dumps({}))
+            file.write(encrypted_data)
 
-    # Add the new weather data to the list of weather data for this city
+def save_weather_data(city, weather_data):
+    initialize_encrypted_file()
+    
+    with open(DB_FILE, "rb") as file:
+        encrypted_data = file.read()
+        data = json.loads(decrypt_data(encrypted_data))
+
     data[city] = data.get(city, []) + [weather_data]
 
-    # Write the updated data back to the database file
-    with open(DB_FILE, "w") as file:
-        json.dump(data, file)
+    with open(DB_FILE, "wb") as file:
+        encrypted_data = encrypt_data(json.dumps(data))
+        file.write(encrypted_data)
 
-# Define a function to get the weather data for a city
 def get_weather_data(city):
-    # Try to open the database file and load its contents
-    try:
-        with open(DB_FILE, "r") as file:
-            data = json.load(file)
-            # Return the list of weather data for this city, or an empty list if the city is not in the database
-            return data.get(city, [])
-    # If the file doesn't exist, return an empty list
-    except FileNotFoundError:
-        return []
+    initialize_encrypted_file()
+
+    with open(DB_FILE, "rb") as file:
+        encrypted_data = file.read()
+        data = json.loads(decrypt_data(encrypted_data))
+        return data.get(city, [])

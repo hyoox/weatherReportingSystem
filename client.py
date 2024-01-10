@@ -9,6 +9,8 @@ ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
+is_admin = False  # Flag to track if the logged-in user is an admin
+
 # Define a function to send a weather request
 async def send_weather_request(city, websocket):
     # Send the request
@@ -67,14 +69,18 @@ async def heartbeat(websocket):
 
 # Define a function to authenticate the user
 async def authenticate(websocket):
+    global is_admin
     username = input("Enter your username: ")
     password = input("Enter your password: ")
     # Send the authentication request
     await websocket.send(json.dumps({"type": "authenticate", "username": username, "password": password}))
     # Wait for the response
     response = await websocket.recv()
-    # Return True if the user is authenticated, False otherwise
-    return json.loads(response).get("status") == "authenticated"
+    response_data = json.loads(response)
+    if response_data.get("status") == "authenticated":
+        is_admin = username == "admin"  # Set is_admin based on username
+        return True
+    return False
 
 # Define the main client loop
 async def client_loop():
@@ -91,8 +97,10 @@ async def client_loop():
                     # If the user wants to quit, break the loop
                     break
                 elif action.lower() == 'history':
-                    # If the user wants the history, request it
-                    await request_history(websocket)
+                    if not is_admin:
+                        print("Unauthorized: Only admins can access history.")
+                    else:
+                        await request_history(websocket)
                 elif action.lower() == 'weather':
                     # If the user wants the weather, request it
                     city = input("Enter city name: ")

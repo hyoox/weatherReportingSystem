@@ -59,10 +59,8 @@ async def handle_client(websocket, path):
             # Handle history request messages
             elif data["type"] == "get_history":
                 username = clients[websocket]
-                # Check if the user is authenticated and is an admin
-                # TODO: fix it here tommorow
-                if not username or not is_admin(username):
-                    # If not, send an error message
+                if username is None or not is_admin(username):
+                    # Send an error message if the user is not authenticated or not an admin
                     await websocket.send(json.dumps({"error": "Unauthorized"}))
                 else:
                     city = data["city"]
