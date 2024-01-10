@@ -6,25 +6,17 @@ from utils import fetch_weather
 from database import save_weather_data, get_weather_data
 from auth import authenticate, is_admin
 
-# Create an SSL context for the server
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-# Load the server's certificate and private key
 ssl_context.load_cert_chain('localhost.pem', 'localhost-key.pem')
 
-# Initialize dictionaries to store the clients and their usernames
 clients = {}
-usernames = {}
 
-# Define the function to handle client connections
 async def handle_client(websocket, path):
-    # Initialize the client with no username
     clients[websocket] = None
     print("New client on login screen!")
 
     try:
-        # Process incoming messages
         async for message in websocket:
-            # Parse the message as JSON
             data = json.loads(message)
 
             # Handle authentication messages
@@ -41,20 +33,15 @@ async def handle_client(websocket, path):
                     # If authentication fails, send an error message
                     await websocket.send(json.dumps({"error": "Authentication failed"}))
 
-            # Handle weather request messages
+
             elif data["type"] == "weather_request":
                 city = data["city"]
-                username = clients[websocket]
-                print(f"{username} requested weather for {city}")
-                # Fetch the weather data
                 weather_data = fetch_weather(city)
                 if weather_data:
-                    # If the weather data is found, save it and send it to the client
                     save_weather_data(city, weather_data)
-                    await websocket.send(json.dumps(weather_data))
+                    await websocket.send(json.dumps({"type": "weather_data", "data": weather_data}))
                 else:
-                    # If the weather data is not found, send an error message
-                    await websocket.send(json.dumps({"error": "Data not found, please try again with another city name."}))
+                    await websocket.send(json.dumps({"type": "error", "message": "Data not found"}))
 
             # Handle history request messages
             elif data["type"] == "get_history":
@@ -64,12 +51,12 @@ async def handle_client(websocket, path):
                     await websocket.send(json.dumps({"error": "Unauthorized"}))
                 else:
                     city = data["city"]
-                    # Fetch the weather history
-                    history = get_weather_data(city)
-                    # Send the weather history to the client
-                    await websocket.send(json.dumps({"history": history}))
+                    weather_history = get_weather_data(city)
+                    if weather_history:
+                        await websocket.send(json.dumps({"type": "history_data", "data": weather_history}))
+                    else:
+                        await websocket.send(json.dumps({"type": "error", "message": "History data not found"}))
 
-            # Handle heartbeat messages
             elif data["type"] == "heartbeat":
                 username = clients[websocket]
                 print(f"Heartbeat received from {username}")
@@ -84,14 +71,10 @@ async def handle_client(websocket, path):
             username = clients.pop(websocket, "Unknown")
             print(f"{username} disconnected")
 
-# Define the main function
 async def main():
-    # Start the WebSocket server
     async with websockets.serve(handle_client, "localhost", 8765, ssl=ssl_context):
         print("Server started")
-        # Keep the server running forever
         await asyncio.Future()
 
-# Run the main function when the script is executed
 if __name__ == "__main__":
     asyncio.run(main())

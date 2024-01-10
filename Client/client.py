@@ -3,47 +3,50 @@ import json
 import websockets
 import ssl
 
-# Create an SSL context for the client
 ssl_context = ssl.create_default_context()
-# Disable hostname checking and certificate verification for simplicity
 ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
-is_admin = False  # Flag to track if the logged-in user is an admin
+is_admin = False
+message_queue = asyncio.Queue()
 
-# Define a function to send a weather request
+async def receiver(websocket):
+    while True:
+        message = await websocket.recv()
+        data = json.loads(message)
+        await message_queue.put(data)
+
 async def send_weather_request(city, websocket):
-    # Send the request
     await websocket.send(json.dumps({"type": "weather_request", "city": city}))
-    # Wait for the response
-    response = await websocket.recv()
-    # Parse the response as JSON
-    weather_data = json.loads(response)
+    while True:
+        response = await message_queue.get()
+        if response.get("type") == "weather_data":
+            weather_data = response["data"]
+            temperature = weather_data['main']['temp']
+            humidity = weather_data['main']['humidity']
+            description = weather_data['weather'][0]['description']
+            print(f"Weather in {city}:")
+            print(f"Temperature: {temperature} °C")
+            print(f"Humidity: {humidity}%")
+            print(f"Description: {description}")
+            break
+        elif response.get("type") == "error":
+            print(response["message"])
+            break
 
-    # If there is no error in the response, print the weather data
-    if 'error' not in weather_data:
-        temperature = weather_data['main']['temp']
-        humidity = weather_data['main']['humidity']
-        description = weather_data['weather'][0]['description']
-        print(f"Weather in {city}:")
-        print(f"Temperature: {temperature} °C")
-        print(f"Humidity: {humidity}%")
-        print(f"Description: {description}")
-    else:
-        # If there is an error in the response, print the error message
-        print(weather_data['error'])
-
-# Define a function to request the weather history for a city
 async def request_history(websocket):
     city = input("Enter city name for history: ")
-    # Send the request
     await websocket.send(json.dumps({"type": "get_history", "city": city}))
-    # Wait for the response
-    response = await websocket.recv()
-    # Parse the response as JSON and get the history data
-    history_data = json.loads(response).get("history", [])
-    
-    # If there is history data, print it
+    try:
+        while True:
+            response = await asyncio.wait_for(message_queue.get(), timeout=10.0)
+            if response.get("type") == "history_data":
+                history_data = response.get("data")
+                break
+    except asyncio.TimeoutError:
+        print("Response timed out.")
+        return
+
     if history_data:
         print(f"Weather history for {city}:")
         for record in history_data:
@@ -52,49 +55,38 @@ async def request_history(websocket):
             description = record.get('weather', [{}])[0].get('description', 'N/A')
             print(f"  - Temp: {temp}°C, Humidity: {humidity}%, Description: {description}")
     else:
-        # If there is no history data, print a message
         print("No history found for this city.")
 
-# Define a function to send heartbeat messages
 async def heartbeat(websocket):
     while True:
         try:
-            # Send a heartbeat message
             await websocket.send(json.dumps({"type": "heartbeat"}))
-            # Wait for 10 seconds
             await asyncio.sleep(10)
         except websockets.exceptions.ConnectionClosed:
-            # If the connection is closed, break the loop
             break
 
-# Define a function to authenticate the user
 async def authenticate(websocket):
     global is_admin
     username = input("Enter your username: ")
     password = input("Enter your password: ")
-    # Send the authentication request
     await websocket.send(json.dumps({"type": "authenticate", "username": username, "password": password}))
-    # Wait for the response
     response = await websocket.recv()
     response_data = json.loads(response)
     if response_data.get("status") == "authenticated":
-        is_admin = username == "admin"  # Set is_admin based on username
+        is_admin = username == "admin"
         return True
     return False
 
-# Define the main client loop
 async def client_loop():
-    # Connect to the server
     async with websockets.connect('wss://localhost:8765', ssl=ssl_context) as websocket:
-        # Authenticate the user
         if await authenticate(websocket):
-            # Start the heartbeat task
-            asyncio.create_task(heartbeat(websocket))
+            receiver_task = asyncio.create_task(receiver(websocket))
+            heartbeat_task = asyncio.create_task(heartbeat(websocket))
             while True:
-                # Ask the user for an action
                 action = input("Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
                 if action.lower() == 'quit':
-                    # If the user wants to quit, break the loop
+                    receiver_task.cancel()
+                    heartbeat_task.cancel()
                     break
                 elif action.lower() == 'history':
                     if not is_admin:
@@ -102,13 +94,10 @@ async def client_loop():
                     else:
                         await request_history(websocket)
                 elif action.lower() == 'weather':
-                    # If the user wants the weather, request it
                     city = input("Enter city name: ")
                     await send_weather_request(city, websocket)
         else:
-            # If authentication fails, print a message
             print("Authentication failed.")
 
-# Run the main client loop
 if __name__ == "__main__":
     asyncio.run(client_loop())
