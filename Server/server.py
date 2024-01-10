@@ -4,7 +4,7 @@ import websockets
 import ssl
 from utils import fetch_weather
 from database import save_weather_data, get_weather_data
-from auth import authenticate, is_admin
+from auth import authenticate, is_admin, change_password
 
 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 ssl_context.load_cert_chain('localhost.pem', 'localhost-key.pem')
@@ -66,6 +66,15 @@ async def handle_client(websocket, path):
             elif data["type"] == "heartbeat":
                 username = clients[websocket]
                 print(f"Heartbeat received from {username}")
+
+            elif data["type"] == "change_password":
+                username = clients[websocket]
+                new_password = data["new_password"]
+                if username:
+                    change_password(username, new_password)
+                    await websocket.send(json.dumps({"type": "password_changed"}))  
+                else:
+                    await websocket.send(json.dumps({"type": "error", "message": "User not authenticated"}))
 
     # Handle unexpected disconnections
     except websockets.exceptions.ConnectionClosed:

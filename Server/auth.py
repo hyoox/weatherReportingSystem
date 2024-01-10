@@ -1,17 +1,27 @@
-# Define a dictionary of users and their passwords
-users = {
-    "admin": "admin",
-    "user": "user",
-    "user1": "user1",
-}
+# auth.py
+import json
 
-# Define a function to authenticate a user
+USERS_FILE = 'users.json'
+
+def load_users():
+    try:
+        with open(USERS_FILE, 'r') as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+
+def save_users(users):
+    with open(USERS_FILE, 'w') as file:
+        json.dump(users, file)
+
 def authenticate(username, password):
-    # Check if the provided password matches the password for this user
-    # If the user doesn't exist, users.get(username) will return None, so the function will return False
+    users = load_users()
     return users.get(username) == password
 
-# Define a function to check if a user is an admin
 def is_admin(username):
-    # Check if the username is "admin"
     return username == "admin"
+
+def change_password(username, new_password):
+    users = load_users()
+    users[username] = new_password
+    save_users(users)

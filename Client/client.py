@@ -40,7 +40,7 @@ async def handle_broadcasts():
         print(f"Temperature: {temperature} °C")
         print(f"Humidity: {humidity}%")
         print(f"Description: {description}")
-        print("Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
+        print("Enter 'weather' for weather info, 'history' for history, 'change' to change password, or 'quit' to exit: ")
 
 
 async def send_weather_request(city, websocket):
@@ -104,6 +104,18 @@ async def authenticate(websocket):
         return True
     return False
 
+async def change_password(websocket):
+    new_password = get_user_input("Enter new password: ")
+    await websocket.send(json.dumps({"type": "change_password", "new_password": new_password}))
+    try:
+        while True:
+            response = await asyncio.wait_for(message_queue.get(), timeout=10.0)
+            if response.get("type") == "password_changed":
+                print("Password changed successfully.")
+                break
+    except asyncio.TimeoutError:
+        print("Response timed out.")
+
 async def client_loop():
     async with websockets.connect('wss://localhost:8765', ssl=ssl_context) as websocket:
         if await authenticate(websocket):
@@ -111,7 +123,7 @@ async def client_loop():
             heartbeat_task = asyncio.create_task(heartbeat(websocket))
             broadcast_task = asyncio.create_task(handle_broadcasts())
             while True:
-                action = await asyncio.get_event_loop().run_in_executor(None, get_user_input, "Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
+                action = await asyncio.get_event_loop().run_in_executor(None, get_user_input, "Enter 'weather' for weather info, 'history' for history, 'change' to change password, or 'quit' to exit: ")
                 if action.lower() == 'quit':
                     receiver_task.cancel()
                     heartbeat_task.cancel()
@@ -125,6 +137,8 @@ async def client_loop():
                 elif action.lower() == 'weather':
                     city = await asyncio.get_event_loop().run_in_executor(None, get_user_input, "Enter city name: ")
                     await send_weather_request(city, websocket)
+                elif action.lower() == 'change':
+                    await change_password(websocket)
         else:
             print("Authentication failed.")
 
