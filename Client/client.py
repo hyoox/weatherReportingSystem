@@ -2,6 +2,11 @@ import asyncio
 import json
 import websockets
 import ssl
+import threading
+
+def get_user_input(prompt):
+    return input(prompt)
+
 
 ssl_context = ssl.create_default_context()
 ssl_context.check_hostname = False
@@ -10,11 +15,33 @@ ssl_context.verify_mode = ssl.CERT_NONE
 is_admin = False
 message_queue = asyncio.Queue()
 
+broadcast_queue = asyncio.Queue()
+
 async def receiver(websocket):
     while True:
         message = await websocket.recv()
         data = json.loads(message)
-        await message_queue.put(data)
+        # Handle weather broadcast messages
+        if data["type"] == "weather_broadcast":
+            await broadcast_queue.put(data)
+        else:
+            await message_queue.put(data)
+
+async def handle_broadcasts():
+    while True:
+        data = await broadcast_queue.get()
+        weather_data = data["data"]
+        city = data["city"]
+        temperature = weather_data['main']['temp']
+        humidity = weather_data['main']['humidity']
+        description = weather_data['weather'][0]['description']
+        print()
+        print(f"Weather update for {city} broadcasted from other client:")
+        print(f"Temperature: {temperature} °C")
+        print(f"Humidity: {humidity}%")
+        print(f"Description: {description}")
+        print("Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
+
 
 async def send_weather_request(city, websocket):
     await websocket.send(json.dumps({"type": "weather_request", "city": city}))
@@ -82,11 +109,13 @@ async def client_loop():
         if await authenticate(websocket):
             receiver_task = asyncio.create_task(receiver(websocket))
             heartbeat_task = asyncio.create_task(heartbeat(websocket))
+            broadcast_task = asyncio.create_task(handle_broadcasts())
             while True:
-                action = input("Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
+                action = await asyncio.get_event_loop().run_in_executor(None, get_user_input, "Enter 'weather' for weather info, 'history' for history, or 'quit' to exit: ")
                 if action.lower() == 'quit':
                     receiver_task.cancel()
                     heartbeat_task.cancel()
+                    broadcast_task.cancel()
                     break
                 elif action.lower() == 'history':
                     if not is_admin:
@@ -94,10 +123,14 @@ async def client_loop():
                     else:
                         await request_history(websocket)
                 elif action.lower() == 'weather':
-                    city = input("Enter city name: ")
+                    city = await asyncio.get_event_loop().run_in_executor(None, get_user_input, "Enter city name: ")
                     await send_weather_request(city, websocket)
         else:
             print("Authentication failed.")
 
+
 if __name__ == "__main__":
     asyncio.run(client_loop())
+
+
+

@@ -39,9 +39,15 @@ async def handle_client(websocket, path):
                 weather_data = fetch_weather(city)
                 if weather_data:
                     save_weather_data(city, weather_data)
+                    # Send the weather data to the requesting client
                     await websocket.send(json.dumps({"type": "weather_data", "data": weather_data}))
+                    # Broadcast the weather data to all other clients
+                    for client, username in clients.items():
+                        if client != websocket:
+                            await client.send(json.dumps({"type": "weather_broadcast", "data": weather_data, "city": city}))
                 else:
                     await websocket.send(json.dumps({"type": "error", "message": "Data not found"}))
+
 
             # Handle history request messages
             elif data["type"] == "get_history":
