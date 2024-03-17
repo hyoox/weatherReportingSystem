@@ -2,7 +2,7 @@ import json
 import requests
 
 # API key for the OpenWeatherMap API
-API_KEY = '2af3148bfd752e60a47e64137e475823'
+API_KEY = 'YOURAPIKEY'
 
 # Function to fetch weather data for a given city
 def fetch_weather(city):
